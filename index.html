@@ -1,15 +1,13 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Karya Makmur AI - Tire Specialist</title>
+  <title>Karya Makmur AI - Toko Ban Digital</title>
   
-  <!-- Tailwind CSS -->
+  <!-- Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Babel for direct TSX rendering -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,46 +15,62 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
   <style>
-    :root { --primary-glow: rgba(56, 189, 248, 0.3); }
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
       background-color: #020617;
       margin: 0;
       color: #f8fafc;
+      overflow-x: hidden;
     }
+    
+    /* Splash Screen Pulse */
     #root:empty::before {
-      content: 'Memuat Aplikasi Karya Makmur...';
+      content: 'MEMULAI SISTEM KARYA MAKMUR...';
       display: flex;
       align-items: center;
       justify-content: center;
       height: 100vh;
-      font-size: 14px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 4px;
       color: #38bdf8;
       animation: pulse 2s infinite;
     }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     
     .glass-card {
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
+
     .tire-3d {
-      box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 15px 30px rgba(0,0,0,0.5);
-      border: 3px solid #1e293b;
-      background: radial-gradient(circle at center, #334155 0%, #0f172a 75%);
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.9), 0 20px 40px rgba(0,0,0,0.6);
+      border: 4px solid #1e293b;
+      background: radial-gradient(circle at center, #334155 0%, #0f172a 80%);
     }
+
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+    
+    @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .animate-spin-slow { animation: spin-slow 12s linear infinite; }
+    
+    @keyframes tire-grind {
+      0% { transform: rotate(0deg) scale(1); }
+      50% { transform: rotate(180deg) scale(1.03); }
+      100% { transform: rotate(360deg) scale(1); }
+    }
+    .animate-grind { animation: tire-grind 0.8s linear infinite; }
+    
+    .map-container iframe { filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(90%); border-radius: 1.5rem; }
   </style>
 
   <script>
-    // FIX: Mencegah crash karena process.env tidak ada di browser murni
-    window.process = {
-      env: {
-        API_KEY: "" // Akan diisi otomatis jika tersedia atau diabaikan oleh SDK
-      }
-    };
+    // Shim untuk environment variable yang dibutuhkan SDK Gemini
+    window.process = { env: { API_KEY: "" } };
   </script>
 
   <script type="importmap">
@@ -66,8 +80,7 @@
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom": "https://esm.sh/react-dom@^19.2.3",
     "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.474.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/"
   }
@@ -77,25 +90,303 @@
 <body>
   <div id="root"></div>
 
-  <!-- Entry Point Langsung di HTML untuk menghindari isu loading file .tsx eksternal -->
   <script type="text/babel" data-type="module" data-presets="react,typescript">
-    import React from 'react';
+    import React, { useState, useEffect, useCallback, useMemo } from 'react';
     import ReactDOM from 'react-dom/client';
-    import App from './App.tsx';
+    import { 
+      Search, RefreshCw, Edit3, Trash2, X, Lock, Unlock, 
+      Disc, ChevronDown, ChevronRight, Sparkles, Send, Phone, MapPin, Plus
+    } from 'lucide-react';
+    import { GoogleGenAI } from "@google/genai";
 
-    try {
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(<App />);
-    } catch (err) {
-      console.error("Gagal memuat aplikasi:", err);
-      document.getElementById('root').innerHTML = `
-        <div style="padding: 20px; text-align: center; color: #ef4444;">
-          <h2>Gagal Memuat Aplikasi</h2>
-          <p>${err.message}</p>
-          <button onclick="location.reload()" style="background: #38bdf8; color: white; border: none; padding: 10px 20px; border-radius: 8px;">Coba Lagi</button>
+    // --- CONFIGURATION ---
+    const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbyAFLNLQ1TQPzFet_AX3POuw89jtt66QStx2uEKUYjw89KwQngGswS990dpJTeeE6eN/exec";
+    const ADMIN_PASSWORD = "admin123";
+    const SHOP_WA = "081272895108";
+    const SHOP_LAT = -5.420319813492731;
+    const SHOP_LNG = 105.80189172275784;
+    const SHOP_ADDR = "Karya Makmur, Kec. Labuhan Maringgai, Lampung Timur";
+
+    // --- TYPES ---
+    // (Inlined directly as per request)
+
+    // --- SERVICES ---
+    const fetchProductsFromScript = async (url) => {
+      try {
+        const response = await fetch(url.trim(), { method: 'GET', mode: 'cors', cache: 'no-store' });
+        if (!response.ok) throw new Error("Gagal ambil data");
+        const rawData = await response.json();
+        let rows = Array.isArray(rawData) ? rawData : (rawData[Object.keys(rawData)[0]] || []);
+        if (rows.length === 0) return [];
+        const hasHeader = rows[0] && isNaN(Number(rows[0][0]));
+        const dataRows = hasHeader ? rows.slice(1) : rows;
+        return dataRows.map((row, index) => {
+          const getVal = (idx) => Array.isArray(row) ? row[idx] : row[Object.keys(row)[idx]];
+          const brand = String(getVal(2) || '').trim();
+          const code = String(getVal(3) || '').trim();
+          if (!brand && !code) return null;
+          return {
+            id: `p-${index}`,
+            nomor: parseInt(getVal(0)) || (index + 1),
+            category: String(getVal(1) || 'Ban').trim(),
+            brand, code,
+            size: String(getVal(4) || '-'),
+            ring: String(getVal(5) || '-'),
+            stock: Number(getVal(6)) || 0,
+            image: `https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=400&h=300&sig=${index}`,
+          };
+        }).filter(p => p !== null);
+      } catch (err) {
+        console.error(err);
+        return [];
+      }
+    };
+
+    const getGeminiResponse = async (prompt, products) => {
+      const apiKey = window.process.env.API_KEY || "";
+      if (!apiKey) return "Fitur AI membutuhkan API Key aktif.";
+      const ai = new GoogleGenAI({ apiKey });
+      const context = products.map(p => `- ${p.brand} ${p.code} (${p.size} R${p.ring}) Stok: ${p.stock}`).join('\n');
+      try {
+        const res = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: prompt,
+          config: {
+            systemInstruction: `Anda asisten Karya Makmur Lampung. Data stok:\n${context}\nJawab ramah dan singkat.`
+          }
+        });
+        return res.text || "Database sedang sibuk.";
+      } catch {
+        return "Gagal terhubung ke AI.";
+      }
+    };
+
+    // --- MAIN APP COMPONENT ---
+    const App = () => {
+      const [products, setProducts] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [showSplash, setShowSplash] = useState(true);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [isAdmin, setIsAdmin] = useState(false);
+      const [showLogin, setShowLogin] = useState(false);
+      const [passInput, setPassInput] = useState('');
+      const [chat, setChat] = useState([{ role: 'assistant', content: 'Halo! Ada ukuran ban yang sedang dicari hari ini?' }]);
+      const [input, setInput] = useState('');
+      const [isTyping, setIsTyping] = useState(false);
+      const [selectedProduct, setSelectedProduct] = useState(null);
+      const [expandedBrands, setExpandedBrands] = useState(new Set());
+      const [saleQty, setSaleQty] = useState(1);
+
+      const load = useCallback(async () => {
+        setLoading(true);
+        const data = await fetchProductsFromScript(DEFAULT_SHEET_URL);
+        setProducts(data);
+        setLoading(false);
+      }, []);
+
+      useEffect(() => {
+        load();
+        const timer = setTimeout(() => setShowSplash(false), 2500);
+        return () => clearTimeout(timer);
+      }, [load]);
+
+      const filtered = useMemo(() => {
+        return products.filter(p => 
+          p.brand.toLowerCase().includes(searchQuery.toLowerCase()) || 
+          p.size.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.code.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }, [products, searchQuery]);
+
+      const grouped = useMemo(() => {
+        const groups = {};
+        filtered.forEach(p => {
+          const b = p.brand.toUpperCase();
+          if (!groups[b]) groups[b] = [];
+          groups[b].push(p);
+        });
+        return groups;
+      }, [filtered]);
+
+      const handleSend = async () => {
+        if (!input.trim()) return;
+        const msg = input;
+        const history = [...chat, { role: 'user', content: msg }];
+        setChat(history);
+        setInput('');
+        setIsTyping(true);
+        const reply = await getGeminiResponse(msg, products);
+        setChat([...history, { role: 'assistant', content: reply }]);
+        setIsTyping(false);
+      };
+
+      if (showSplash) return (
+        <div className="fixed inset-0 bg-[#020617] flex flex-col items-center justify-center z-[100]">
+          <div className="animate-grind w-32 h-32 rounded-full tire-3d flex items-center justify-center">
+             <Disc size={64} className="text-sky-400 opacity-80" />
+          </div>
+          <h1 className="mt-8 text-2xl font-black tracking-[0.4em] text-white uppercase">KARYA <span className="text-sky-500">MAKMUR</span></h1>
+          <p className="mt-2 text-slate-500 text-[10px] tracking-widest font-bold">DIGITAL WAREHOUSE v2.3</p>
         </div>
-      `;
-    }
+      );
+
+      return (
+        <div className="min-h-screen pb-12">
+          {/* Header */}
+          <header className="sticky top-0 z-50 glass-card px-6 h-20 flex items-center justify-between border-b border-white/5">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center border border-white/10 tire-3d">
+                <Disc className="text-sky-400 animate-spin-slow" size={20} />
+              </div>
+              <h1 className="text-sm font-black uppercase tracking-tighter text-white">Karya <span className="text-sky-400">Makmur</span></h1>
+            </div>
+            
+            <div className="flex gap-2">
+              <button onClick={() => isAdmin ? setIsAdmin(false) : setShowLogin(true)} className={`p-2.5 rounded-xl border transition-all ${isAdmin ? 'bg-sky-500 border-sky-400 text-white' : 'bg-slate-900/40 border-white/10 text-slate-500'}`}>
+                {isAdmin ? <Unlock size={18} /> : <Lock size={18} />}
+              </button>
+              <button onClick={load} className="p-2.5 bg-slate-900/40 border border-white/10 rounded-xl text-slate-500">
+                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-8 space-y-8">
+              {/* Map Section */}
+              <section className="glass-card rounded-[2.5rem] p-6 border border-white/10 flex flex-col md:flex-row gap-8 items-center shadow-2xl">
+                <div className="w-full md:w-56 aspect-square map-container overflow-hidden">
+                  <iframe src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3971.258848419619!2d${SHOP_LNG}!3d${SHOP_LAT}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNcKwMjUnMTMuMSJTIDEwNcKwNDgnMDYuOCJF!5e0!3m2!1sen!2sid!4v1711234567890!5m2!1sen!2sid`} width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy"></iframe>
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-sky-400 px-3 py-1 bg-sky-500/10 rounded-full">Lampung Timur</span>
+                  <h2 className="text-2xl font-black uppercase text-white mt-4 mb-2 tracking-tight">Bengkel Karya Makmur</h2>
+                  <p className="text-slate-400 text-xs uppercase leading-relaxed font-medium mb-6">{SHOP_ADDR}</p>
+                  <button onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${SHOP_LAT},${SHOP_LNG}`, '_blank')} className="px-8 py-3 bg-white text-slate-950 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-sky-400 transition-colors">Petunjuk Navigasi</button>
+                </div>
+              </section>
+
+              {/* Search Bar */}
+              <div className="relative group">
+                <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-sky-400" size={20} />
+                <input type="text" placeholder="Cari merk atau ukuran..." className="w-full pl-16 pr-8 py-6 bg-slate-900/40 border border-white/5 rounded-3xl font-bold text-sm text-white outline-none focus:border-sky-500/30 transition-all placeholder:text-slate-700" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              </div>
+
+              {/* Product Accordion */}
+              <div className="space-y-4">
+                {Object.entries(grouped).map(([brand, items]) => (
+                  <div key={brand} className="glass-card rounded-[2rem] border border-white/5 overflow-hidden">
+                    <button onClick={() => { const n = new Set(expandedBrands); n.has(brand) ? n.delete(brand) : n.add(brand); setExpandedBrands(n); }} className="w-full p-6 flex items-center justify-between hover:bg-white/5 transition-colors">
+                      <h3 className="font-black uppercase text-sm tracking-widest text-white">{brand} <span className="text-slate-500 ml-2">({items.length})</span></h3>
+                      <ChevronDown size={20} className={`text-slate-600 transition-transform ${expandedBrands.has(brand) ? 'rotate-180 text-sky-400' : ''}`} />
+                    </button>
+                    {expandedBrands.has(brand) && (
+                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/5 bg-black/20">
+                        {items.map(p => (
+                          <div key={p.id} className="bg-slate-900/40 p-4 rounded-2xl border border-white/5 flex gap-4 hover:border-sky-500/30 transition-all group">
+                            <div className="w-20 h-20 bg-black rounded-xl overflow-hidden border border-white/5 flex-shrink-0">
+                               <img src={p.image} className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div className="flex-1">
+                               <div className="flex justify-between">
+                                  <h4 className="font-black text-[10px] uppercase text-white tracking-widest">{p.code}</h4>
+                                  <span className={`text-[8px] font-black px-2 py-0.5 rounded ${p.stock > 0 ? 'bg-sky-500/10 text-sky-400' : 'bg-rose-500/10 text-rose-400'}`}>STOCK: {p.stock}</span>
+                               </div>
+                               <p className="text-[14px] text-white font-black mt-1">{p.size} <span className="text-slate-600">R{p.ring}</span></p>
+                               <button onClick={() => { setSelectedProduct(p); setSaleQty(1); }} className="mt-3 text-[9px] font-black uppercase tracking-widest text-sky-400 flex items-center gap-1">DETAIL <ChevronRight size={12}/></button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Sidebar AI */}
+            <div className="lg:col-span-4 h-[600px] lg:sticky lg:top-24">
+              <div className="glass-card rounded-[2.5rem] h-full flex flex-col border border-white/10 shadow-2xl overflow-hidden">
+                <div className="p-6 bg-slate-950/40 border-b border-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Sparkles size={16} className="text-sky-400" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white">ASISTEN GUDANG AI</span>
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                  {chat.map((m, i) => (
+                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] p-4 rounded-2xl text-[11px] font-medium ${m.role === 'user' ? 'bg-sky-600 text-white' : 'bg-slate-900/60 text-slate-300 border border-white/5'}`}>
+                        {m.content}
+                      </div>
+                    </div>
+                  ))}
+                  {isTyping && <div className="text-[10px] text-slate-500 font-bold animate-pulse px-2">SISTEM BERPIKIR...</div>}
+                </div>
+                <div className="p-6 bg-slate-950/40 border-t border-white/5 flex gap-2">
+                  <input type="text" placeholder="Tanya stok ban..." className="flex-1 bg-slate-900/60 border border-white/10 rounded-2xl px-5 py-4 text-xs text-white outline-none focus:border-sky-500/30" value={input} onChange={e => setInput(e.target.value)} onKeyPress={e => e.key==='Enter' && handleSend()} />
+                  <button onClick={handleSend} className="p-4 bg-sky-500 text-white rounded-2xl active:scale-90 transition-transform"><Send size={18}/></button>
+                </div>
+              </div>
+            </div>
+          </main>
+
+          {/* Login Modal */}
+          {showLogin && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-sm">
+              <div className="glass-card w-full max-w-sm rounded-[3rem] p-10 text-center space-y-8 border-white/10">
+                <div className="w-16 h-16 bg-slate-900 rounded-3xl flex items-center justify-center mx-auto shadow-xl"><Lock className="text-sky-400" size={24} /></div>
+                <h3 className="font-black uppercase text-xs tracking-[0.3em] text-white">Akses Admin</h3>
+                <input type="password" placeholder="PIN" className="w-full py-5 bg-slate-950 rounded-2xl border border-white/5 text-center text-white outline-none focus:border-sky-500 font-black text-xl tracking-[1em]" value={passInput} onChange={e => setPassInput(e.target.value)} />
+                <div className="flex flex-col gap-3">
+                  <button onClick={() => passInput===ADMIN_PASSWORD ? (setIsAdmin(true), setShowLogin(false), setPassInput('')) : alert('PIN Salah')} className="w-full py-4 bg-sky-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest">Akses</button>
+                  <button onClick={()=>setShowLogin(false)} className="py-2 text-[10px] text-slate-600 uppercase font-black tracking-widest">Batal</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Detail Modal */}
+          {selectedProduct && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-sm">
+              <div className="glass-card w-full max-w-md rounded-[3rem] p-10 space-y-8 relative overflow-hidden">
+                <button onClick={()=>setSelectedProduct(null)} className="absolute top-8 right-8 text-slate-600 hover:text-white transition-colors"><X size={24}/></button>
+                <div className="text-center space-y-4">
+                  <div className="w-24 h-24 bg-slate-900 rounded-[2rem] mx-auto overflow-hidden shadow-2xl border border-white/5"><img src={selectedProduct.image} className="w-full h-full object-cover" /></div>
+                  <h3 className="font-black text-2xl uppercase text-white tracking-tighter">{selectedProduct.brand}</h3>
+                  <p className="text-xs font-bold text-slate-500 tracking-widest uppercase">{selectedProduct.code}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-950/60 p-5 rounded-3xl border border-white/5 text-center">
+                    <span className="block text-[10px] text-slate-600 font-black uppercase mb-1">Ukuran</span>
+                    <span className="text-lg font-black text-white">{selectedProduct.size}</span>
+                  </div>
+                  <div className="bg-slate-950/60 p-5 rounded-3xl border border-white/5 text-center">
+                    <span className="block text-[10px] text-slate-600 font-black uppercase mb-1">Ring</span>
+                    <span className="text-lg font-black text-white">R{selectedProduct.ring}</span>
+                  </div>
+                </div>
+                <div className="bg-slate-950/60 p-6 rounded-3xl border border-white/5 flex items-center justify-around">
+                   <button onClick={() => setSaleQty(Math.max(1, saleQty-1))} className="text-2xl font-black text-sky-500 w-12 h-12 flex items-center justify-center hover:bg-white/5 rounded-full">-</button>
+                   <div className="text-center">
+                     <span className="block text-[9px] text-slate-600 font-black uppercase">Quantity</span>
+                     <span className="text-4xl font-black text-white">{saleQty}</span>
+                   </div>
+                   <button onClick={() => setSaleQty(Math.min(selectedProduct.stock, saleQty+1))} className="text-2xl font-black text-sky-500 w-12 h-12 flex items-center justify-center hover:bg-white/5 rounded-full">+</button>
+                </div>
+                <button onClick={() => window.open(`https://wa.me/62${SHOP_WA.substring(1)}?text=${encodeURIComponent(`Halo, saya ingin menanyakan stok ban ${selectedProduct.brand} ${selectedProduct.code} (${selectedProduct.size} R${selectedProduct.ring}) sebanyak ${saleQty} unit.`)}`, '_blank')} className="w-full py-5 bg-emerald-500 text-white rounded-[1.5rem] font-black uppercase text-[11px] tracking-widest flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
+                  Pesan via WhatsApp <Phone size={18}/>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>

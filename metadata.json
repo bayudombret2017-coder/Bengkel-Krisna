@@ -1,0 +1,8 @@
+{
+  "name": "Copy of TAMBAL BAN SIMANGUNSONG",
+  "description": "A modern marketplace powered by Google Sheets and Gemini AI. Manage your inventory in a spreadsheet and let AI help your customers find the perfect products.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
